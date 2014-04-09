@@ -21,6 +21,7 @@ install:
     - git config --global user.email "you@example.com"
     - git config --global user.name "Your Name"
     - echo -e "[ui]\nusername = Your Name <your@email.com>" > ~/.hgrc
+    - bzr whoami "Your Name <you@example.com>"
 
 script:
     - py.test pep8radius/test_pep8radius.py --cov=pep8radius
