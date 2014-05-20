@@ -15,10 +15,6 @@ if sys.version_info < (2, 7):
 else:
     from unittest import main, SkipTest, TestCase
 
-def make_path_nix_like(path_to_fix):
-    """ On Windows machines, paths will have \\ instead of /, fix
-    this."""
-    return path_to_fix.replace('\\', '/')
 
 ROOT_DIR = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
 sys.path.insert(0, ROOT_DIR)
@@ -30,14 +26,10 @@ from pep8radius import (Radius, RadiusGit, RadiusHg,
                         version, get_diff)
 
 PEP8RADIUS = os.path.join(ROOT_DIR, 'pep8radius.py')
-PEP8RADIUS = make_path_nix_like(PEP8RADIUS)
 
 TEMP_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                         'temp')
-TEMP_DIR = make_path_nix_like(TEMP_DIR)
-
 SUBTEMP_DIR = os.path.join(TEMP_DIR, 'subtemp')
-SUBTEMP_DIR = make_path_nix_like(SUBTEMP_DIR)
 try:
     os.mkdir(TEMP_DIR)
 except OSError:
@@ -164,9 +156,6 @@ class TestRadius(TestCase):
             raise SkipTest("%s not available" % self.vc)
 
         temp_file = os.path.join(TEMP_DIR, 'temp.py')
-        # not changing this one yet - might need to apply this path_fix
-        # function to the main file.
-        #temp_file = make_path_nix_like(temp_file)
 
         options = parse_args(options)
 
