@@ -15,6 +15,11 @@ if sys.version_info < (2, 7):
 else:
     from unittest import main, SkipTest, TestCase
 
+def make_path_nix_like(path_to_fix):
+    """ On Windows machines, paths will have \\ instead of /.  This
+    wouldn't be a problem, but the program output (from autopep8?) uses
+    /, so change to / so the assert_equal's will work correctly."""
+    return path_to_fix.replace('\\', '/')
 
 ROOT_DIR = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
 sys.path.insert(0, ROOT_DIR)
@@ -30,6 +35,8 @@ PEP8RADIUS = os.path.join(ROOT_DIR, 'pep8radius.py')
 TEMP_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                         'temp')
 SUBTEMP_DIR = os.path.join(TEMP_DIR, 'subtemp')
+TEMP_DIR = make_path_nix_like(TEMP_DIR)
+SUBTEMP_DIR = make_path_nix_like(SUBTEMP_DIR)
 try:
     os.mkdir(TEMP_DIR)
 except OSError:
@@ -181,7 +188,7 @@ class TestRadius(TestCase):
             r.pep8radius()
         exp_diff = get_diff(modified, expected, temp_file)
         # last char in getvalue is an additional new line
-        self.assertEqual(exp_diff, out.getvalue()[:-1])
+        self.assert_equal(exp_diff, out.getvalue()[:-1], test_name)
         options.diff = False
 
 
