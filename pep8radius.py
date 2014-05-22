@@ -1,6 +1,7 @@
 from __future__ import print_function
 import argparse
 import autopep8
+import colorama
 import docformatter
 from difflib import unified_diff
 from itertools import takewhile
@@ -12,10 +13,6 @@ import subprocess
 from subprocess import STDOUT, CalledProcessError
 import sys
 
-try:
-    from StringIO import StringIO
-except ImportError:  # pragma: no cover
-    from io import StringIO
 
 # python 2.6 doesn't include check_output
 if "check_output" not in dir(subprocess):  # pragma: no cover
@@ -24,49 +21,56 @@ if "check_output" not in dir(subprocess):  # pragma: no cover
 
     def check_output(*popenargs, **kwargs):
         if 'stdout' in kwargs:  # pragma: no cover
-            raise ValueError('stdout argument not allowed, it will be overridden.')
-        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+            raise ValueError('stdout argument not allowed, '
+                             'it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE,
+                                   *popenargs, **kwargs)
         output, unused_err = process.communicate()
         retcode = process.poll()
         if retcode:
             cmd = kwargs.get("args")
             if cmd is None:
                 cmd = popenargs[0]
-            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+            raise subprocess.CalledProcessError(retcode, cmd,
+                                                output=output)
         return output
     subprocess.check_output = check_output
 
     class CalledProcessError(Exception):
+
         def __init__(self, returncode, cmd, output=None):
             self.returncode = returncode
             self.cmd = cmd
             self.output = output
+
         def __str__(self):
             return "Command '%s' returned non-zero exit status %d" % (
                 self.cmd, self.returncode)
-    # overwrite CalledProcessError due to `output` keyword might be not available
+    # overwrite CalledProcessError due to `output`
+    # keyword not being available (in 2.6)
     subprocess.CalledProcessError = CalledProcessError
 check_output = subprocess.check_output
 
 
-__version__ = version = '0.7'
+__version__ = version = '0.8a'
 
 
 DEFAULT_IGNORE = 'E24'
 DEFAULT_INDENT_SIZE = 4
 
 
-def main():
-    try: # pragma: no cover
+def main(args=None):
+    try:  # pragma: no cover
         # Exit on broken pipe.
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     except AttributeError:  # pragma: no cover
         # SIGPIPE is not available on Windows.
         pass
 
-    try:
+    if args is None:
         args = parse_args(sys.argv[1:])
 
+    try:
         # main
         if args.version:
             print(version)
@@ -122,6 +126,8 @@ def parse_args(arguments=None):
                         help="make the changes in place")
     parser.add_argument('-f', '--docformatter', action='store_true',
                         help='fix docstrings for PEP257 using docformatter')
+    parser.add_argument('--no-color', action='store_true',
+                        help='do not print diffs in color')
 
     # autopep8 options
     parser.add_argument('-p', '--pep8-passes', metavar='n',
@@ -201,6 +207,7 @@ class Radius:
         self.verbose = self.options.verbose
         self.in_place = self.options.in_place
         self.diff = self.options.diff
+        self.color = not self.options.no_color
 
         # autopep8 specific options
         self.options.verbose = max(0, self.options.verbose - 1)
@@ -262,7 +269,7 @@ class Radius:
 
         if self.diff:
             for diff in pep8_diffs:
-                print(diff)
+                self.print_diff(diff, color=self.color)
 
     def pep8radius_file(self, file_name):
         """Apply autopep8 to the diff lines of a file.
@@ -330,7 +337,7 @@ class Radius:
         root_dir = self.root_dir()
         py_files_full = [os.path.join(root_dir,
                                       file_name)
-                            for file_name in py_files]
+                         for file_name in py_files]
 
         return list(py_files_full)
 
@@ -343,6 +350,32 @@ class Radius:
         if min_ <= self.verbose <= max_:
             print(something_to_print, end=end)
             sys.stdout.flush()
+
+    def print_diff(self, diff, color=True):
+        if self.diff and diff:
+
+            if not color:
+                print(diff)
+                return
+
+            colorama.init(autoreset=True)  # TODO use context_manager
+            for line in diff.splitlines():
+                if line.startswith('+') and not line.startswith('+++ '):
+                    # Note there shouldn't be trailing whitespace
+                    # but may be nice to generalise this
+                    print(colorama.Fore.GREEN + line)
+                elif line.startswith('-') and not line.startswith('--- '):
+                    split_whitespace = re.split('(\s+)$', line)
+                    if len(split_whitespace) > 1:  # claim it must be 3
+                        line, trailing, _ = split_whitespace
+                    else:
+                        line, trailing = split_whitespace[0], ''
+                    print(colorama.Fore.RED + line, end='')
+                    # give trailing whitespace a RED background
+                    print(colorama.Back.RED + trailing)  
+                else:
+                    print(line)
+            colorama.deinit()
 
 
 # #####   udiff parsing   #####
@@ -389,8 +422,8 @@ def get_diff(original, fixed, file_name,
     original, fixed = original.splitlines(True), fixed.splitlines(True)
     newline = '\n'
     diff = unified_diff(original, fixed,
-                        file_name + '/' + original_label,
-                        file_name + '/' + fixed_label,
+                        os.path.join(file_name, original_label),
+                        os.path.join(file_name, fixed_label), 
                         lineterm=newline)
     text = ''
     for line in diff:
@@ -414,7 +447,8 @@ class RadiusGit(Radius):
     @staticmethod
     def root_dir():
         output = check_output(['git', 'rev-parse', '--show-toplevel'])
-        return output.strip().decode('utf-8')
+        root = output.strip().decode('utf-8')
+        return os.path.normpath(root)
 
     def file_diff_cmd(self, f):
         "Get diff for one file, f"
