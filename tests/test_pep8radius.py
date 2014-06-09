@@ -20,6 +20,7 @@ ROOT_DIR = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
 sys.path.insert(0, ROOT_DIR)
 from pep8radius import (Radius, RadiusGit, RadiusHg,
                         check_output, CalledProcessError, STDOUT,
+                        main,
                         parse_args,
                         which_version_control,
                         using_git, using_hg,
@@ -50,6 +51,16 @@ def captured_output():
         yield sys.stdout, sys.stderr
     finally:
         sys.stdout, sys.stderr = old_out, old_err
+
+def pep8radius_main(args):
+    if isinstance(args, list):
+        args = parse_args(args)
+    with captured_output() as (out, err):
+        try:
+            main(args)
+        except SystemExit:
+            pass
+    return out.getvalue().strip()
 
 
 class TestRadiusNoVCS(TestCase):
@@ -101,7 +112,8 @@ class TestRadiusNoVCS(TestCase):
         self.assertEqual(us.select, them.select)
         self.assertEqual(us.ignore, them.ignore)
 
-        args = ['hello.py', '--select=E1,W1', '--ignore=W601', '--max-line-length', '120']
+        args = ['hello.py', '--select=E1,W1', '--ignore=W601',
+                '--max-line-length', '120']
         us = parse_args(args)
         them = autopep8.parse_args(args)
         self.assertEqual(us.select, them.select)
@@ -114,13 +126,13 @@ class TestRadiusNoVCS(TestCase):
         self.assertEqual(us.aggressive, them.aggressive)
 
     def test_version_number(self):
-        version_ = check_output(['python', PEP8RADIUS, '--version'])
-        version_ = version_.decode('utf-8').strip()
+        version_ = pep8radius_main(['--version'])
         self.assertEqual(version_, version)
 
     def test_list_fixes(self):
-        fixes = check_output(['python', PEP8RADIUS, '--list-fixes'])
-        afixes = check_output(['autopep8', '--list-fixes'])
+        fixes = pep8radius_main(['--list-fixes'])
+        afixes = check_output(['autopep8', '--list-fixes'])\
+                   .decode("utf-8").strip()
         self.assertEqual(fixes, afixes)
 
     def test_bad_rev(self):
@@ -183,10 +195,8 @@ class TestRadius(TestCase):
         with captured_output() as (out, err):
             r.pep8radius()
         exp_diff = get_diff(modified, expected, temp_file)
-        # last char in getvalue is an additional new line
-        self.assert_equal(out.getvalue()[:-1], exp_diff, test_name)
+        self.assert_equal(out.getvalue(), exp_diff, test_name)
         options.diff = False
-
 
         options.in_place = True
         r = Radius.new(vc=self.vc, options=options)
@@ -198,7 +208,9 @@ class TestRadius(TestCase):
         self.assert_equal(result, expected, test_name)
 
         # Run pep8radius again, it *should* be that this doesn't do anything.
-        r.pep8radius()
+        with captured_output() as (out, err):
+            pep8radius_main(options)
+        self.assertEqual(out.getvalue(), '')
 
         with open(temp_file, 'r') as f:
             result = f.read()
@@ -225,13 +237,14 @@ class MixinTests:
         original = 'def poor_indenting():\n  a = 1\n  b = 2\n  return a + b\n\nfoo = 1; bar = 2; print(foo * bar)\na=1; b=2; c=3\nd=7\n\ndef f(x = 1, y = 2):\n    return x + y\n'
         modified = 'def poor_indenting():\n  a = 1\n  b = 2\n  return a + b\n\nfoo = 1; bar = 2; print(foo * bar)\na=1; b=42; c=3\nd=7\n\ndef f(x = 1, y = 2):\n    return x + y\n'
         expected = 'def poor_indenting():\n  a = 1\n  b = 2\n  return a + b\n\nfoo = 1; bar = 2; print(foo * bar)\na = 1\nb = 42\nc = 3\nd=7\n\ndef f(x = 1, y = 2):\n    return x + y\n'
-        self.check(original, modified, expected, 'test_one_line', directory=SUBTEMP_DIR)
+        self.check(original, modified, expected, 'test_one_line',
+                   directory=SUBTEMP_DIR)
 
     def test_with_docformatter(self):
         original = 'def poor_indenting():\n  """       Great function"""\n  a = 1\n  b = 2\n  return a + b\n\n\n\nfoo = 1; bar = 2; print(foo * bar)\na=1; b=2; c=3\nd=7\n\ndef f(x = 1, y = 2):\n    return x + y\n'
         modified = 'def poor_indenting():\n  """  Very great function"""\n  a = 1\n  b = 2\n  return a + b\n\n\n\nfoo = 1; bar = 2; print(foo * bar)\na=1; b=42; c=3\nd=7\n\ndef f(x = 1, y = 2):\n    return x + y\n'
         expected = 'def poor_indenting():\n  """  Very great function"""\n  a = 1\n  b = 2\n  return a + b\n\n\n\nfoo = 1; bar = 2; print(foo * bar)\na = 1\nb = 42\nc = 3\nd=7\n\ndef f(x = 1, y = 2):\n    return x + y\n'
-        self.check(original, modified, expected, 'test_with_docformatter',)
+        self.check(original, modified, expected, 'test_with_docformatter')
 
         expected = 'def poor_indenting():\n  """Very great function."""\n  a = 1\n  b = 2\n  return a + b\n\n\n\nfoo = 1; bar = 2; print(foo * bar)\na = 1\nb = 42\nc = 3\nd=7\n\ndef f(x = 1, y = 2):\n    return x + y\n'
         self.check(original, modified, expected,

@@ -52,7 +52,7 @@ if "check_output" not in dir(subprocess):  # pragma: no cover
 check_output = subprocess.check_output
 
 
-__version__ = version = '0.8a'
+__version__ = version = '0.8.1'
 
 
 DEFAULT_IGNORE = 'E24'
@@ -202,7 +202,7 @@ class Radius:
 
     def __init__(self, rev=None, options=None):
         # pep8radius specific options
-        self.rev = rev if rev is not None else self.current_branch()
+        self.rev = self._branch_point(rev)
         self.options = options if options else parse_args([''])
         self.verbose = self.options.verbose
         self.in_place = self.options.in_place
@@ -321,10 +321,8 @@ class Radius:
         cmd = self.filenames_diff_cmd()
 
         # Note: This may raise a CalledProcessError
-        diff_files_b = check_output(cmd, stderr=STDOUT)
-
-        diff_files_u = diff_files_b.decode('utf-8')
-        diff_files = self.parse_diff_filenames(diff_files_u)
+        diff_files = check_output(cmd, stderr=STDOUT).decode('utf-8')
+        diff_files = self.parse_diff_filenames(diff_files)
 
         py_files = set(f for f in diff_files if f.endswith('.py'))
 
@@ -352,30 +350,44 @@ class Radius:
             sys.stdout.flush()
 
     def print_diff(self, diff, color=True):
-        if self.diff and diff:
+        if not self.diff or not diff:
+            return
 
-            if not color:
-                print(diff)
-                return
+        if not color:
+            colorama.init = lambda autoreset: None
+            colorama.Fore.RED = ''
+            colorama.Back.RED = ''
+            colorama.Fore.GREEN = ''
+            colorama.deinit = lambda: None
 
-            colorama.init(autoreset=True)  # TODO use context_manager
-            for line in diff.splitlines():
-                if line.startswith('+') and not line.startswith('+++ '):
-                    # Note there shouldn't be trailing whitespace
-                    # but may be nice to generalise this
-                    print(colorama.Fore.GREEN + line)
-                elif line.startswith('-') and not line.startswith('--- '):
-                    split_whitespace = re.split('(\s+)$', line)
-                    if len(split_whitespace) > 1:  # claim it must be 3
-                        line, trailing, _ = split_whitespace
-                    else:
-                        line, trailing = split_whitespace[0], ''
-                    print(colorama.Fore.RED + line, end='')
-                    # give trailing whitespace a RED background
-                    print(colorama.Back.RED + trailing)  
+        colorama.init(autoreset=True)  # TODO use context_manager
+        for line in diff.splitlines():
+            if line.startswith('+') and not line.startswith('+++ '):
+                # Note there shouldn't be trailing whitespace
+                # but may be nice to generalise this
+                print(colorama.Fore.GREEN + line)
+            elif line.startswith('-') and not line.startswith('--- '):
+                split_whitespace = re.split('(\s+)$', line)
+                if len(split_whitespace) > 1:  # claim it must be 3
+                    line, trailing, _ = split_whitespace
                 else:
-                    print(line)
-            colorama.deinit()
+                    line, trailing = split_whitespace[0], ''
+                print(colorama.Fore.RED + line, end='')
+                # give trailing whitespace a RED background
+                print(colorama.Back.RED + trailing)
+            elif line == '\ No newline at end of file':
+                # The assumption here is that there is now a new line...
+                print(colorama.Fore.RED + line)
+            else:
+                print(line)
+        colorama.deinit()
+
+    def _branch_point(self, rev=None):
+        current = self.current_branch()
+        if rev is None:
+            return current
+        else:
+            return self.merge_base(rev, current)
 
 
 # #####   udiff parsing   #####
@@ -423,7 +435,7 @@ def get_diff(original, fixed, file_name,
     newline = '\n'
     diff = unified_diff(original, fixed,
                         os.path.join(file_name, original_label),
-                        os.path.join(file_name, fixed_label), 
+                        os.path.join(file_name, fixed_label),
                         lineterm=newline)
     text = ''
     for line in diff:
@@ -449,6 +461,11 @@ class RadiusGit(Radius):
         output = check_output(['git', 'rev-parse', '--show-toplevel'])
         root = output.strip().decode('utf-8')
         return os.path.normpath(root)
+
+    @staticmethod
+    def merge_base(rev1, rev2):
+        output = check_output(['git', 'merge-base', rev1, rev2])
+        return output.strip().decode('utf-8')
 
     def file_diff_cmd(self, f):
         "Get diff for one file, f"
@@ -476,13 +493,18 @@ class RadiusHg(Radius):
         output = check_output(['hg', 'root'])
         return output.strip().decode('utf-8')
 
+    @staticmethod
+    def merge_base(rev1, rev2):
+        output = check_output(['hg', 'debugancestor', rev1, rev2])
+        return output.strip().decode('utf-8').split(':')[1]
+
     def file_diff_cmd(self, f):
         "Get diff for one file, f"
         return ['hg', 'diff', '-r', self.rev, f]
 
     def filenames_diff_cmd(self):
         "Get the names of the py files in diff"
-        return ["hg", "diff", "--stat", "-c", self.rev]
+        return ["hg", "diff", "--stat", "-r", self.rev]
 
     @staticmethod
     def parse_diff_filenames(diff_files):
@@ -501,7 +523,7 @@ def using_git():
     try:
         git_log = check_output(["git", "log"], stderr=STDOUT)
         return True
-    except (CalledProcessError, OSError):
+    except (CalledProcessError, OSError):  # pragma: no cover
         return False
 
 
@@ -513,7 +535,7 @@ def using_hg():
         return False
 
 
-def which_version_control():
+def which_version_control():  # pragma: no cover
     """Try to see if they are using git or hg.
     return git, hg or raise NotImplementedError.
 
@@ -529,5 +551,5 @@ def which_version_control():
                               "Ensure you're in the project directory.")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
