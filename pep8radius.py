@@ -12,7 +12,7 @@ import signal
 import subprocess
 from subprocess import STDOUT, CalledProcessError
 import sys
-
+from copy import deepcopy
 
 # python 2.6 doesn't include check_output
 if "check_output" not in dir(subprocess):  # pragma: no cover
@@ -49,7 +49,27 @@ if "check_output" not in dir(subprocess):  # pragma: no cover
     # overwrite CalledProcessError due to `output`
     # keyword not being available (in 2.6)
     subprocess.CalledProcessError = CalledProcessError
-check_output = subprocess.check_output
+
+
+# Need to monkey-patch (much nicer than duck punching) check_output
+def check_output_clean(func):
+    """Using check_output with universal_newlines=True results in bytes,
+    not a string, being returned in Python 3.  This function is used to
+    decorate check_output to return the same result on Python 2 and 3."""
+    def func_wrapper(*args, **kwargs):
+        temp = func(*args, **kwargs)
+        try:
+            temp = temp.decode("utf-8")
+        finally:
+            return temp.strip()
+    return func_wrapper
+
+check_output_old = deepcopy(subprocess.check_output)
+@check_output_clean
+def check_output(*args, **kwargs):
+    kwargs['universal_newlines'] = True
+    return check_output_old(*args, **kwargs)
+subprocess.check_output = check_output
 
 
 __version__ = version = '0.8.1'
@@ -279,7 +299,7 @@ class Radius:
         # We hope that a CalledProcessError would have already raised
         # during the init if it were going to raise here.
         cmd = self.file_diff_cmd(file_name)
-        diff = check_output(cmd).decode('utf-8')
+        diff = check_output(cmd)
 
         with open(file_name, 'r') as f:
             original = f.read()
@@ -321,7 +341,7 @@ class Radius:
         cmd = self.filenames_diff_cmd()
 
         # Note: This may raise a CalledProcessError
-        diff_files = check_output(cmd, stderr=STDOUT).decode('utf-8')
+        diff_files = check_output(cmd, stderr=STDOUT)
         diff_files = self.parse_diff_filenames(diff_files)
 
         py_files = set(f for f in diff_files if f.endswith('.py'))
@@ -453,19 +473,16 @@ class RadiusGit(Radius):
 
     @staticmethod
     def current_branch():
-        output = check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-        return output.strip().decode('utf-8')
+        return check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
 
     @staticmethod
     def root_dir():
-        output = check_output(['git', 'rev-parse', '--show-toplevel'])
-        root = output.strip().decode('utf-8')
+        root = check_output(['git', 'rev-parse', '--show-toplevel'])
         return os.path.normpath(root)
 
     @staticmethod
     def merge_base(rev1, rev2):
-        output = check_output(['git', 'merge-base', rev1, rev2])
-        return output.strip().decode('utf-8')
+        return check_output(['git', 'merge-base', rev1, rev2])
 
     def file_diff_cmd(self, f):
         "Get diff for one file, f"
@@ -485,18 +502,16 @@ class RadiusHg(Radius):
 
     @staticmethod
     def current_branch():
-        output = check_output(["hg", "id", "-b"])
-        return output.strip().decode('utf-8')
+        return check_output(["hg", "id", "-b"])
 
     @staticmethod
     def root_dir():
-        output = check_output(['hg', 'root'])
-        return output.strip().decode('utf-8')
+        return check_output(['hg', 'root'])
 
     @staticmethod
     def merge_base(rev1, rev2):
         output = check_output(['hg', 'debugancestor', rev1, rev2])
-        return output.strip().decode('utf-8').split(':')[1]
+        return output.split(':')[1]
 
     def file_diff_cmd(self, f):
         "Get diff for one file, f"

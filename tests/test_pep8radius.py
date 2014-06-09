@@ -62,7 +62,6 @@ def pep8radius_main(args):
             pass
     return out.getvalue().strip()
 
-
 class TestRadiusNoVCS(TestCase):
 
     def __init__(self, *args, **kwargs):
@@ -131,8 +130,7 @@ class TestRadiusNoVCS(TestCase):
 
     def test_list_fixes(self):
         fixes = pep8radius_main(['--list-fixes'])
-        afixes = check_output(['autopep8', '--list-fixes'])\
-                   .decode("utf-8").strip()
+        afixes = check_output(['autopep8', '--list-fixes'])
         self.assertEqual(fixes, afixes)
 
     def test_bad_rev(self):
