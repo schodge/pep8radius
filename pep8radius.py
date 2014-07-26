@@ -515,11 +515,11 @@ class RadiusHg(Radius):
 
     def file_diff_cmd(self, f):
         "Get diff for one file, f"
-        return ['hg', 'diff', '-r', self.rev, f]
+        return ['hg', 'diff', f]
 
     def filenames_diff_cmd(self):
         "Get the names of the py files in diff"
-        return ["hg", "diff", "--stat", "-r", self.rev]
+        return ["hg", "status", "--modified", "--added", "--no-status"]
 
     @staticmethod
     def parse_diff_filenames(diff_files):
