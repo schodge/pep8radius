@@ -97,3 +97,8 @@ optional arguments:
                         in a mess; used by docformatter
 ```
 *For more information about these options see [autopep8](https://pypi.python.org/pypi/autopep8).*
+
+Known Bugs & Workarounds
+-------
+- In the event of odd errors when running the test suite, make sure your VCS is set up correctly.  Failure to set a user name in Hg, for example, will produce a series of errors that look nothing like a simple misconfiguration.
+- The test suite clean-up has been known to fail on Windows, apparently because of permissions issues.  If you get error messages to the effect branches already exist when running `nosetests`, try removing the `/tests/temp/` directory to see if that fixes.
