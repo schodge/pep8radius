@@ -7,16 +7,18 @@ from setuptools import setup
 from sys import version_info
 
 
-NAME = 'pep8radius' #  'Better-Than-You-Found-It'
+NAME = 'pep8radius'  # 'Better-Than-You-Found-It'
 
 
 def version():
     """Return version string."""
     with open(os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                           'pep8radius.py')) as input_file:
+                           'pep8radius',
+                           'main.py')) as input_file:
         for line in input_file:
             if line.startswith('__version__'):
                 return parse(line).body[0].value.s
+
 
 def readme():
     try:
@@ -27,24 +29,25 @@ def readme():
             return f.read()
 
 INSTALL_REQUIRES = (
-    ['autopep8 >= 1.0.2'] +
+    ['autopep8 >= 1.0.4'] +
     (['argparse'] if version_info < (2, 7) else []) +
     ['colorama'] +
-    ['docformatter >= 0.6.1']
+    ['docformatter >= 0.7']
 )
 
 setup(
     name=NAME,
     version=version(),
     description="PEP8 clean only the parts of the files which you have touched"
-                " since the last commit, previous commit or branch.",
+                " since the last commit, a previous commit or (the merge-base"
+                " of) a branch.",
     long_description=readme(),
     license='MIT License',
     author='Andy Hayden',
     author_email='andyhayden1@gmail.com',
     url='https://github.com/hayd/pep8radius',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Environment :: Console',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
@@ -59,12 +62,13 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Software Development :: Quality Assurance',
+        'Topic :: Software Development :: Version Control',
     ],
-    keywords='automation, pep8, format, autopep8, git, hg, mercurial',
+    keywords='automation, pep8, format, autopep8, git, hg, mercurial, bzr',
     install_requires=INSTALL_REQUIRES,
-    test_suite='tests.test_pep8radius',
-    py_modules=['pep8radius'],
+    packages=['pep8radius'],
+    test_suite='tests',
     zip_safe=False,
-    entry_points={'console_scripts': ['btyfi = pep8radius:main',
-                                      'pep8radius = pep8radius:main']},
+    entry_points={'console_scripts': ['btyfi = pep8radius.main:_main',
+                                      'pep8radius = pep8radius.main:_main']},
 )

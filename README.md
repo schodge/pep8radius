@@ -1,7 +1,9 @@
 pep8radius
 ----------
 
-[PEP8](http://legacy.python.org/dev/peps/pep-0008/) clean only the parts of the files touched since the last commit, a previous commit or branch.
+[PEP8](http://legacy.python.org/dev/peps/pep-0008/) clean only the parts of
+the files touched since the last commit, a previous commit or (the merge-base
+of) a branch.
 
 [![Current PyPi Version](http://img.shields.io/pypi/v/pep8radius.svg)](https://pypi.python.org/pypi/pep8radius)
 [![MIT licensed](http://img.shields.io/badge/license-MIT-brightgreen.svg)](http://choosealicense.com/licenses/mit/)
@@ -20,16 +22,10 @@ From pip:
 $ pip install pep8radius
 ```
 
-Requirements
-------------
-pep8radius requires [autopep8](https://pypi.python.org/pypi/autopep8), which in turn requires [pep8](https://pypi.python.org/pypi/pep8). The docformatter option, to fix docstrings, requires [docformatter](https://pypi.python.org/pypi/docformatter).
-
-VCS Support
------------
-[Git](http://git-scm.com/), [Mecurial (hg)](http://mercurial.selenic.com/), [Bazaar](http://bazaar.canonical.com/en/). Please request support for other version control systems on [github](https://github.com/hayd/pep8radius/issues/5).
-
 Usage
 -----
+![Usage gif of pep8radius](https://cloud.githubusercontent.com/assets/1931852/4259885/18a7e75e-3b1a-11e4-9413-d92f9b170b70.gif)
+
 - Move to project directory
 - Make some changes to the project
 - Run `pep8radius --diff       # view a diff of proposed fixed`
@@ -39,13 +35,14 @@ Usage
 Against a branch you can use the same syntax as with git diff:
 
 ```sh
-$ pep8radius master   # branch name
+$ pep8radius master   # branch name to compare against (compares against merge-base)
 $ pep8radius c12166f  # commit hash
 
 $ pep8radius master --in-place  # these work with other options too
 ```
 
-You can also fix docstrings ([PEP257](http://legacy.python.org/dev/peps/pep-0257/)) using the [docformatter](https://pypi.python.org/pypi/docformatter) option:
+You can also fix docstrings ([PEP257](http://legacy.python.org/dev/peps/pep-0257/)) using
+the [docformatter](https://pypi.python.org/pypi/docformatter) option:
 
 ```sh
 $ pep8radius --docformatter --diff
@@ -53,16 +50,65 @@ $ pep8radius --docformatter --diff
 
 *Note: can also use `btyfi` alias for `pep8radius`.*
 
+---
+
+It can be nice to pipe the diff to [cdiff](https://pypi.python.org/pypi/cdiff) (which
+makes diffs pretty and has lots of options):
+
+```sh
+$ pep8radius --diff --no-color | cdiff
+$ pep8radius --diff --no-color | cdiff --side-by-side
+```
+
+You can get strange results if you don't use no-color.  
+I actually use the following git
+alias (which allows `git rad` and `git rad -i`):
+```sh
+[alias]
+    rad = !pep8radius master --diff --no-color $@ | cdiff --side-by-side
+```
+which outputs the corrections as follows:
+
+![git rad](https://cloud.githubusercontent.com/assets/1931852/4259933/f0589480-3b1c-11e4-89cf-565c28da700a.png)
+
+---
+
+You can pipe in a diff directly, to fix the lines modified in it with
+`--from-diff` (this is somewhat experimental, please report failing diffs!).  
+For example:
+
+```sh
+$ git diff master | pep8radius --diff --from-diff=-
+```
+
+Requirements
+------------
+pep8radius uses [autopep8](https://pypi.python.org/pypi/autopep8), and in turn
+[pep8](https://pypi.python.org/pypi/pep8). The docformatter option, to fix
+docstrings, uses [docformatter](https://pypi.python.org/pypi/docformatter).
+
+VCS Support
+-----------
+[Git](http://git-scm.com/), [Mecurial (hg)](http://mercurial.selenic.com/), (tentatively)
+[Bazaar](http://bazaar.canonical.com/en/). Please request support for other version
+control systems on [github](https://github.com/hayd/pep8radius/issues/5).
+
 Options
 -------
 
-```
-usage: pep8radius.py [-h] [--version] [-v] [-d] [-i] [-p n] [-a]
-                     [--experimental] [--exclude globs] [--list-fixes]
-                     [--ignore errors] [--select errors] [--max-line-length n]
-                     [--indent-size n] [--docformatter] [--no-blank]
-                     [--pre-summary-newline] [--force-wrap]
-                     [rev]
+```sh
+$ pep8radius --help
+
+usage: pep8radius [-h] [--version] [-d] [-i] [--no-color] [-v]
+                  [--from-diff DIFF] [-p n] [-a] [--experimental]
+                  [--exclude globs] [--list-fixes] [--ignore errors]
+                  [--select errors] [--max-line-length n] [--indent-size n]
+                  [-f] [--no-blank] [--pre-summary-newline] [--force-wrap]
+                  [--global-config GLOBAL_CONFIG] [--ignore-local-config]
+                  [rev]
+
+PEP8 clean only the parts of the files which you have touched since the last
+commit, a previous commit or (the merge-base of) a branch.
 
 positional arguments:
   rev                   commit or name of branch to compare against
@@ -70,11 +116,18 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   --version             print version number and exit
+  -d, --diff            print the diff of fixed source vs original
+  -i, --in-place        make the fixes in place; modify the files
+  --no-color            do not print diffs in color (default is to use color)
   -v, --verbose         print verbose messages; multiple -v result in more
-                        verbose messages (passed to autopep8)
-  -d, --diff            print the diff for the fixed source
-  -i, --in-place        make the changes in place
-  -f, --docformatter    fix docstrings for PEP257 using docformatter
+                        verbose messages (one less -v is passed to autopep8)
+  --from-diff DIFF      Experimental: rather than calling out to version
+                        control, just pass in a diff; the modified lines will
+                        be fixed
+
+pep8:
+  Pep8 options to pass to autopep8.
+
   -p n, --pep8-passes n
                         maximum number of additional pep8 passes (default:
                         infinite)
@@ -83,17 +136,116 @@ optional arguments:
   --experimental        enable experimental fixes
   --exclude globs       exclude file/directory names that match these comma-
                         separated globs
-  --list-fixes          list codes for fixes; used by --ignore and --select
+  --list-fixes          list codes for fixes and exit; used by --ignore and
+                        --select
   --ignore errors       do not fix these errors/warnings (default: E24)
   --select errors       fix only these errors/warnings (e.g. E4,W)
   --max-line-length n   set maximum allowed line length (default: 79)
   --indent-size n       number of spaces per indent level (default 4)
-  --no-blank            do not add blank line after description; used by
-                        docformatter
+
+docformatter:
+  Fix docstrings for PEP257.
+
+  -f, --docformatter    Use docformatter
+  --no-blank            Do not add blank line after description
   --pre-summary-newline
                         add a newline before the summary of a multi-line
-                        docstring; used by docformatter
+                        docstring
   --force-wrap          force descriptions to be wrapped even if it may result
-                        in a mess; used by docformatter
+                        in a mess
+
+config:
+  Change default options based on global or local (project) config files.
+
+  --global-config filename
+                        path to global pep8 config file; if this file does not
+                        exist then this is ignored (default: ~/.config/pep8)
+  --ignore-local-config
+                        don't look for and apply local config files; if not
+                        passed, defaults are updated with any config files in
+                        the project's root dir
+
+Run before you commit, against a previous commit or branch before merging.
 ```
+
 *For more information about these options see [autopep8](https://pypi.python.org/pypi/autopep8).*
+
+As a module
+-----------
+
+Pep8radius also exports lightweight wrappers around autopep8 so that you can
+fix line ranges of your code with `fix_code` or `fix_file`.
+
+Here's the example "bad code" from [autopep8's README](https://github.com/hhatto/autopep8/blob/master/README.rst#usage):
+
+```py
+import math, sys;
+
+def example1():
+    ####This is a long comment. This should be wrapped to fit within 72 characters.
+    some_tuple=(   1,2, 3,'a'  );
+    some_variable={'long':'Long code lines should be wrapped within 79 characters.',
+    'other':[math.pi, 100,200,300,9876543210,'This is a long string that goes on'],
+    'more':{'inner':'This whole logical line should be wrapped.',some_tuple:[1,
+    20,300,40000,500000000,60000000000000000]}}
+    return (some_tuple, some_variable)
+def example2(): return {'has_key() is deprecated':True}.has_key({'f':2}.has_key(''));
+class Example3(   object ):
+    def __init__    ( self, bar ):
+     #Comments should have a space after the hash.
+     if bar : bar+=1;  bar=bar* bar   ; return bar
+     else:
+                    some_string = """
+               Indentation in multiline strings should not be touched.
+Only actual code should be reindented.
+"""
+                    return (sys.path, some_string)
+```
+You can pep8 fix just the line ranges 1-1 (the imports) and 12-21 (the
+`Example3`class) with `pep8radius.fix_code(code, [(1, 1), (12, 21)])` (where
+code is a string of the above), which returns the code fixed within those
+ranges:
+```py
+import math
+import sys
+
+def example1():
+    ####This is a long comment. This should be wrapped to fit within 72 characters.
+    some_tuple=(   1,2, 3,'a'  );
+    some_variable={'long':'Long code lines should be wrapped within 79 characters.',
+    'other':[math.pi, 100,200,300,9876543210,'This is a long string that goes on'],
+    'more':{'inner':'This whole logical line should be wrapped.',some_tuple:[1,
+    20,300,40000,500000000,60000000000000000]}}
+    return (some_tuple, some_variable)
+def example2(): return {'has_key() is deprecated':True}.has_key({'f':2}.has_key(''));
+
+
+class Example3(object):
+
+    def __init__(self, bar):
+        # Comments should have a space after the hash.
+        if bar:
+            bar += 1
+            bar = bar * bar
+            return bar
+        else:
+            some_string = """
+                       Indentation in multiline strings should not be touched.
+Only actual code should be reindented.
+"""
+            return (sys.path, some_string)
+```
+You can use `fix_file` to do this directly on a file, which gives you the option
+of doing this in place.
+
+```py
+pep8radius.fix_code('code.py', [(1, 1), (12, 21)], in_place=True)
+```
+You can also pass the same arguments to pep8radius script itself using the
+`parse_args`. For example ignoring long lines (E501) and use the options from
+your global config files:
+```py
+args = pep8radius.parse_args(['--ignore=E501', '--ignore-local-config'],
+                             apply_config=True)
+pep8radius.fix_code(code, [(1, 1), (12, 21)], options=args)
+```
